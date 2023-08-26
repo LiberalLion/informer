@@ -19,7 +19,7 @@ This script will build our your database for you
 
 def init_db():
     global session, SERVER_MODE, engine
-    logging.info('{}: Initializing the database'.format(sys._getframe().f_code.co_name))
+    logging.info(f'{sys._getframe().f_code.co_name}: Initializing the database')
     Account.metadata.create_all(engine)
     ChatUser.metadata.create_all(engine)
     Channel.metadata.create_all(engine)
@@ -44,7 +44,7 @@ def init_data():
 
 def init_add_account():
     global session, SERVER_MODE, engine
-    logging.info('{}: Adding bot account'.format(sys._getframe().f_code.co_name))
+    logging.info(f'{sys._getframe().f_code.co_name}: Adding bot account')
 
     BOT_ACCOUNTS = [
 
@@ -100,10 +100,12 @@ def init_add_channels():
                                  })
             line_count += 1
 
-        logging.info('Inserted {} channels to database'.format(line_count))
+        logging.info(f'Inserted {line_count} channels to database')
 
     for channel in CHANNELS:
-        logging.info('{}: Adding channel {} to database'.format(sys._getframe().f_code.co_name, channel['channel_name']))
+        logging.info(
+            f"{sys._getframe().f_code.co_name}: Adding channel {channel['channel_name']} to database"
+        )
 
         channel_url = channel['channel_url'] if 'channel_url' in channel else None
         channel_id = channel['channel_id'] if 'channel_id' in channel else None
@@ -159,7 +161,9 @@ def init_add_keywords():
     ]
 
     for keyword in KEYWORDS:
-        logging.info('{}: Adding keyword {} to the database'.format(sys._getframe().f_code.co_name, keyword['keyword_description']))
+        logging.info(
+            f"{sys._getframe().f_code.co_name}: Adding keyword {keyword['keyword_description']} to the database"
+        )
 
         session.add(Keyword(
             keyword_description=keyword['keyword_description'],
@@ -183,7 +187,9 @@ def init_add_monitors():
 
     for channel in channels:
         account = accounts[account_index]
-        logging.info('{}: Adding monitoring to channel {} with account_id {} to the database'.format(sys._getframe().f_code.co_name, channel.channel_name, account.account_id))
+        logging.info(
+            f'{sys._getframe().f_code.co_name}: Adding monitoring to channel {channel.channel_name} with account_id {account.account_id} to the database'
+        )
         session.add(Monitor(
             channel_id=channel.id,
             account_id=account.account_id,
@@ -205,25 +211,33 @@ def initialize_db():
 
     if os.getenv('GAE_INSTANCE'):
         SERVER_MODE = 'prod'  # prod vs local
-        MYSQL_CONNECTOR_STRING = 'mysql+mysqlconnector://root:root@YOUR_OWN_IP_HERE:3320/{}'.format(DATABASE_NAME)
+        MYSQL_CONNECTOR_STRING = f'mysql+mysqlconnector://root:root@YOUR_OWN_IP_HERE:3320/{DATABASE_NAME}'
     else:
         SERVER_MODE = 'local'
-        MYSQL_CONNECTOR_STRING = 'mysql+mysqlconnector://root:root@127.0.0.1:3320/{}'.format(DATABASE_NAME)
+        MYSQL_CONNECTOR_STRING = (
+            f'mysql+mysqlconnector://root:root@127.0.0.1:3320/{DATABASE_NAME}'
+        )
 
     engine = db.create_engine(MYSQL_CONNECTOR_STRING)#, echo=True)
     Session = sessionmaker(bind=engine)
     session = None
     session = Session()
-    session.execute("CREATE DATABASE {} CHARACTER SET 'utf8' COLLATE 'utf8_unicode_ci';".format(DATABASE_NAME))
+    session.execute(
+        f"CREATE DATABASE {DATABASE_NAME} CHARACTER SET 'utf8' COLLATE 'utf8_unicode_ci';"
+    )
     session.close()
-    engine = db.create_engine('{}/{}?charset=utf8mb4'.format(MYSQL_CONNECTOR_STRING, DATABASE_NAME))  # , echo=True) # uncomment right most comment if you want to hear all the noise MySQL is making
+    engine = db.create_engine(
+        f'{MYSQL_CONNECTOR_STRING}/{DATABASE_NAME}?charset=utf8mb4'
+    )
     Session = sessionmaker(bind=engine)
     session = None
     session = Session()
 
     # A hack to support unicode for emojis
     session.execute('SET NAMES "utf8mb4" COLLATE "utf8mb4_unicode_ci"')
-    session.execute('ALTER DATABASE {} CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;'.format(DATABASE_NAME))
+    session.execute(
+        f'ALTER DATABASE {DATABASE_NAME} CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;'
+    )
     session.execute('commit')
 
     init_db()
