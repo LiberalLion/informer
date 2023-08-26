@@ -89,12 +89,14 @@ class TGInformer:
 
         if os.getenv('GAE_INSTANCE'):
             self.SERVER_MODE = 'prod'  # prod vs local
-            self.MYSQL_CONNECTOR_STRING = 'mysql+mysqlconnector://{}:{}@{}:{}/{}'.format(db_prod_user, db_prod_password, db_prod_ip, db_prod_port, db_prod_name)
+            self.MYSQL_CONNECTOR_STRING = f'mysql+mysqlconnector://{db_prod_user}:{db_prod_password}@{db_prod_ip}:{db_prod_port}/{db_prod_name}'
         else:
             self.SERVER_MODE = 'local'
-            self.MYSQL_CONNECTOR_STRING = 'mysql+mysqlconnector://{}:{}@{}:{}/{}'.format(db_local_user, db_local_password, db_local_ip, db_local_port, db_local_name)
+            self.MYSQL_CONNECTOR_STRING = f'mysql+mysqlconnector://{db_local_user}:{db_local_password}@{db_local_ip}:{db_local_port}/{db_local_name}'
 
-        logging.info('SERVER_MODE: {} GAE_ENV: {}'.format(self.SERVER_MODE, str(os.getenv('GAE_INSTANCE'))))
+        logging.info(
+            f"SERVER_MODE: {self.SERVER_MODE} GAE_ENV: {str(os.getenv('GAE_INSTANCE'))}"
+        )
 
         # -----------------------------------------
         # Set the channel we want to send alerts to
@@ -135,13 +137,13 @@ class TGInformer:
             self.account = self.session.query(Account).filter_by(account_id=account_id).first()
 
         if not self.account:
-            logging.error('Invalid account_id {} for bot instance'.format(account_id))
+            logging.error(f'Invalid account_id {account_id} for bot instance')
             sys.exit(0)
 
         # ----------------------
         # Telegram service login
         # ----------------------
-        logging.info('Logging in with account # {}'.format(self.account.account_phone))
+        logging.info(f'Logging in with account # {self.account.account_phone}')
         session_file = 'session/' + self.account.account_phone.replace('+', '')
         self.client = TelegramClient(session_file, self.account.account_api_id, self.account.account_api_hash)
 
@@ -162,7 +164,7 @@ class TGInformer:
         # TODO: this function is not complete
         channel = self.client.get_entity(PeerChat(channel_id))
         users = self.client.get_participants(channel)
-        print('total users: {}'.format(users.total))
+        print(f'total users: {users.total}')
         for user in users:
             if user.username is not None and not user.is_self:
                 print(utils.get_display_name(user), user.username, user.id, user.bot, user.verified, user.restricted, user.first_name, user.last_name, user.phone, user.is_self)
@@ -193,7 +195,9 @@ class TGInformer:
     # Get channel by channel URL
     # ==========================
     async def get_channel_info_by_url(self, url):
-        logging.info('{}: Getting channel info with url: {}'.format(sys._getframe().f_code.co_name, url))
+        logging.info(
+            f'{sys._getframe().f_code.co_name}: Getting channel info with url: {url}'
+        )
         channel_hash = utils.parse_username(url)[0]
 
         # -----------------------------------------
@@ -202,10 +206,14 @@ class TGInformer:
         try:
             channel = await self.client.get_entity(channel_hash)
         except ValueError:
-            logging.info('{}: Not a valid telegram URL: {}'.format(sys._getframe().f_code.co_name, url))
+            logging.info(
+                f'{sys._getframe().f_code.co_name}: Not a valid telegram URL: {url}'
+            )
             return False
         except FloodWaitError as e:
-            logging.info('{}: Got a flood wait error for: {}'.format(sys._getframe().f_code.co_name, url))
+            logging.info(
+                f'{sys._getframe().f_code.co_name}: Got a flood wait error for: {url}'
+            )
             await asyncio.sleep(e.seconds * 2)
 
         return {
@@ -223,7 +231,9 @@ class TGInformer:
         u = await self.client.get_input_entity(PeerUser(user_id=user_id))
         user = await self.client(GetFullUserRequest(u))
 
-        logging.info('{}: User ID {} has data:\n {}\n\n'.format(sys._getframe().f_code.co_name, user_id, user))
+        logging.info(
+            f'{sys._getframe().f_code.co_name}: User ID {user_id} has data:\n {user}\n\n'
+        )
 
         return {
             'username': user.user.username,
@@ -273,7 +283,7 @@ class TGInformer:
             if not dialog.is_user:
 
                 # Certain channels have a prefix of 100, lets remove that
-                if str(abs(channel_id))[:3] == '100':
+                if str(abs(channel_id)).startswith('100'):
                     channel_id = int(str(abs(channel_id))[3:])
 
                 # Lets add it to the current list of channels we're in
@@ -377,14 +387,23 @@ class TGInformer:
             # -------------------------------
             # Determine is channel is private
             # -------------------------------
-            channel_is_private = True if (channel['channel_is_private'] or '/joinchat/' in channel['channel_url']) else False
+            channel_is_private = bool(
+                (
+                    channel['channel_is_private']
+                    or '/joinchat/' in channel['channel_url']
+                )
+            )
             if channel_is_private:
                 logging.info('channel_is_private: {}'.format(channel_is_private))
 
             # ------------------------------------------
             # Join if public channel and we're not in it
             # ------------------------------------------
-            if channel['channel_is_group'] is False and channel_is_private is False and channel['channel_id'] not in current_channels:
+            if (
+                channel['channel_is_group'] is False
+                and not channel_is_private
+                and channel['channel_id'] not in current_channels
+            ):
                 logging.info('{}: Joining channel: {} => {}'.format(sys._getframe().f_code.co_name, channel['channel_id'], channel['channel_name']))
                 try:
                     await self.client(JoinChannelRequest(channel=await self.client.get_entity(channel['channel_url'])))
@@ -400,9 +419,6 @@ class TGInformer:
                     logging.info('Channel is private or we were banned bc we didnt respond to bot')
                     channel['channel_is_enabled'] = False
 
-            # ------------------------------------------
-            # Join if private channel and we're not in it
-            # ------------------------------------------
             elif channel_is_private and channel['channel_id'] not in current_channels:
                 channel_obj.channel_is_private = True
                 logging.info('{}: Joining private channel: {} => {}'.format(sys._getframe().f_code.co_name, channel['channel_id'], channel['channel_name']))
@@ -464,10 +480,10 @@ class TGInformer:
         # Channel values from the API are signed ints, lets get ABS for consistency
         channel_id = abs(channel_id)
 
-        message = event.raw_text
-
         # Lets check to see if the message comes from our channel list
         if channel_id in self.channel_list:
+
+            message = event.raw_text
 
             # Lets iterate through our keywords to monitor list
             for keyword in self.keyword_list:
@@ -475,7 +491,8 @@ class TGInformer:
                 # If it matches the regex then voila!
                 if re.search(keyword['regex'], message, re.IGNORECASE):
                     logging.info(
-                        'Filtering: {}\n\nEvent raw text: {} \n\n Data: {}'.format(channel_id, event.raw_text, event))
+                        f'Filtering: {channel_id}\n\nEvent raw text: {event.raw_text} \n\n Data: {event}'
+                    )
 
                     # Lets send the notification with all the pertinent information in the params
                     await self.send_notification(message_obj=event.message, event=event, sender_id=event.sender_id, channel_id=channel_id, keyword=keyword['name'], keyword_id=keyword['id'])
@@ -489,23 +506,20 @@ class TGInformer:
         # Lets set the meta data
         is_mention = message_obj.mentioned
         is_scheduled = message_obj.from_scheduled
-        is_fwd = False if message_obj.fwd_from is None else True
-        is_reply = False if message_obj.reply_to_msg_id is None else True
-        is_bot = False if message_obj.via_bot_id is None else True
+        is_fwd = message_obj.fwd_from is not None
+        is_reply = message_obj.reply_to_msg_id is not None
+        is_bot = message_obj.via_bot_id is not None
 
         if isinstance(message_obj.to_id, PeerChannel):
             is_channel = True
             is_group = False
-            is_private = False
         elif isinstance(message_obj.to_id, PeerChat):
             is_channel = False
             is_group = True
-            is_private = False
         else:
             is_channel = False
             is_group = False
-            is_private = False
-
+        is_private = False
         # We track the channel size and set it to expire after sometime, if it does we update the participant size
         if channel_id in self.channel_meta and self.channel_meta[channel_id]['channel_size'] == 0 or datetime.now() > self.channel_meta[channel_id]['channel_texpire']:
             logging.info('refreshing the channel information')
@@ -521,8 +535,10 @@ class TGInformer:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Set the message for the notification we're about to send in our monitor channel
-        message = '⚠️ "{}" mentioned by {} in => "{}" url: {}\n\n Message:\n"{}\ntimestamp: {}'.format(keyword, sender_username, self.channel_meta[channel_id]['channel_title'], self.channel_meta[channel_id]['channel_url'], message_text,timestamp)
-        logging.info('{} Sending notification {}'.format(sys._getframe().f_code.co_name, message))
+        message = f"""⚠️ "{keyword}" mentioned by {sender_username} in => "{self.channel_meta[channel_id]['channel_title']}" url: {self.channel_meta[channel_id]['channel_url']}\n\n Message:\n"{message_text}\ntimestamp: {timestamp}"""
+        logging.info(
+            f'{sys._getframe().f_code.co_name} Sending notification {message}'
+        )
 
         # ----------------
         # Send the message
@@ -623,7 +639,6 @@ class TGInformer:
         # ------------------------------
         # TODO: functionality to poll the DB for new keywords and refresh in memory
         logging.info('### updating keyword_list')
-        pass
 
     # ===========================
     # Loop we run while we listen
@@ -652,4 +667,3 @@ class TGInformer:
                 loop.run_until_complete(self.bot_task)
             except asyncio.CancelledError:
                 logging.info('### Async cancelled')
-                pass
